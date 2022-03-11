@@ -13,7 +13,8 @@
 #![allow(missing_docs, non_upper_case_globals, non_snake_case)]
 // official Unicode test data
 // http://www.unicode.org/Public/14.0.0/ucd/auxiliary/GraphemeBreakTest.txt
-pub const TEST_SAME: &'static [(&'static str, &'static [&'static str])] = &[
+#[utf32_lit::utf32_all_strings]
+pub const TEST_SAME: &'static [(&'static [char], &'static [&'static [char]])] = &[
     ("\u{20}\u{20}", &["\u{20}", "\u{20}"]),
     ("\u{20}\u{308}\u{20}", &["\u{20}\u{308}", "\u{20}"]),
     ("\u{20}\u{d}", &["\u{20}", "\u{d}"]),
@@ -671,10 +672,11 @@ pub const TEST_SAME: &'static [(&'static str, &'static [&'static str])] = &[
     ("\u{61}\u{200d}\u{2701}", &["\u{61}\u{200d}", "\u{2701}"]),
 ];
 
+#[utf32_lit::utf32_all_strings]
 pub const TEST_DIFF: &'static [(
-    &'static str,
-    &'static [&'static str],
-    &'static [&'static str],
+    &'static [char],
+    &'static [&'static [char]],
+    &'static [&'static [char]],
 )] = &[
     ("\u{20}\u{903}", &["\u{20}\u{903}"], &["\u{20}", "\u{903}"]),
     (
@@ -887,7 +889,8 @@ pub const TEST_DIFF: &'static [(
 
 // official Unicode test data
 // http://www.unicode.org/Public/14.0.0/ucd/auxiliary/WordBreakTest.txt
-pub const TEST_WORD: &'static [(&'static str, &'static [&'static str])] = &[
+#[utf32_lit::utf32_all_strings]
+pub const TEST_WORD: &'static [(&'static [char], &'static [&'static [char]])] = &[
     ("\u{1}\u{1}", &["\u{1}", "\u{1}"]),
     ("\u{1}\u{308}\u{1}", &["\u{1}\u{308}", "\u{1}"]),
     ("\u{1}\u{d}", &["\u{1}", "\u{d}"]),
@@ -4918,7 +4921,8 @@ pub const TEST_WORD: &'static [(&'static str, &'static [&'static str])] = &[
 
 // official Unicode test data
 // http://www.unicode.org/Public/14.0.0/ucd/auxiliary/SentenceBreakTest.txt
-pub const TEST_SENTENCE: &'static [(&'static str, &'static [&'static str])] = &[
+#[utf32_lit::utf32_all_strings]
+pub const TEST_SENTENCE: &'static [(&'static [char], &'static [&'static [char]])] = &[
         ("\u{1}\u{1}", &["\u{1}\u{1}"]), ("\u{1}\u{308}\u{1}", &["\u{1}\u{308}\u{1}"]),
         ("\u{1}\u{d}", &["\u{1}\u{d}"]), ("\u{1}\u{308}\u{d}", &["\u{1}\u{308}\u{d}"]),
         ("\u{1}\u{a}", &["\u{1}\u{a}"]), ("\u{1}\u{308}\u{a}", &["\u{1}\u{308}\u{a}"]),

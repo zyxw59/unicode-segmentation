@@ -196,12 +196,14 @@ def escape_char(c):
     return "'\\u{%x}'" % c
 
 def emit_table(f, name, t_data, t_type = "&'static [(char, char)]", is_pub=True,
-        pfun=lambda x: "(%s,%s)" % (escape_char(x[0]), escape_char(x[1])), is_const=True):
+        pfun=lambda x: "(%s,%s)" % (escape_char(x[0]), escape_char(x[1])), is_const=True, utf32=False):
     pub_string = "const"
     if not is_const:
         pub_string = "let"
     if is_pub:
         pub_string = "pub " + pub_string
+    if utf32:
+        f.write("    #[utf32_lit::utf32_all_strings]\n")
     f.write("    %s %s: %s = &[\n" % (pub_string, name, t_type))
     data = ""
     first = True

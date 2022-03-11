@@ -26,20 +26,20 @@ use crate::tables::word::WordCat;
 /// [`unicode_words`]: trait.UnicodeSegmentation.html#tymethod.unicode_words
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 pub struct UnicodeWords<'a> {
-    inner: Filter<UWordBounds<'a>, fn(&&str) -> bool>,
+    inner: Filter<UWordBounds<'a>, fn(&&[char]) -> bool>,
 }
 
 impl<'a> Iterator for UnicodeWords<'a> {
-    type Item = &'a str;
+    type Item = &'a [char];
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<&'a [char]> {
         self.inner.next()
     }
 }
 impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
+    fn next_back(&mut self) -> Option<&'a [char]> {
         self.inner.next_back()
     }
 }
@@ -58,20 +58,20 @@ impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
 /// [`unicode_word_indices`]: trait.UnicodeSegmentation.html#tymethod.unicode_word_indices
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 pub struct UnicodeWordIndices<'a> {
-    inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &str)) -> bool>,
+    inner: Filter<UWordBoundIndices<'a>, fn(&(usize, &[char])) -> bool>,
 }
 
 impl<'a> Iterator for UnicodeWordIndices<'a> {
-    type Item = (usize, &'a str);
+    type Item = (usize, &'a [char]);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
+    fn next(&mut self) -> Option<(usize, &'a [char])> {
         self.inner.next()
     }
 }
 impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
+    fn next_back(&mut self) -> Option<(usize, &'a [char])> {
         self.inner.next_back()
     }
 }
@@ -86,7 +86,7 @@ impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct UWordBounds<'a> {
-    string: &'a str,
+    string: &'a [char],
     cat: Option<WordCat>,
     catb: Option<WordCat>,
 }
@@ -109,27 +109,31 @@ impl<'a> UWordBoundIndices<'a> {
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::UnicodeSegmentation;
-    /// let mut iter = "Hello world".split_word_bound_indices();
-    /// assert_eq!(iter.as_str(), "Hello world");
+    /// let mut iter = utf32!("Hello world").split_word_bound_indices();
+    /// assert_eq!(iter.as_chars(), utf32!("Hello world"));
     /// iter.next();
-    /// assert_eq!(iter.as_str(), " world");
+    /// assert_eq!(iter.as_chars(), utf32!(" world"));
     /// iter.next();
-    /// assert_eq!(iter.as_str(), "world");
+    /// assert_eq!(iter.as_chars(), utf32!("world"));
     /// ```
-    pub fn as_str(&self) -> &'a str {
-        self.iter.as_str()
+    pub fn as_chars(&self) -> &'a [char] {
+        self.iter.as_chars()
     }
 }
 
 impl<'a> Iterator for UWordBoundIndices<'a> {
-    type Item = (usize, &'a str);
+    type Item = (usize, &'a [char]);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
-        self.iter
-            .next()
-            .map(|s| (s.as_ptr() as usize - self.start_offset, s))
+    fn next(&mut self) -> Option<(usize, &'a [char])> {
+        self.iter.next().map(|s| {
+            (
+                (s.as_ptr() as usize - self.start_offset) / core::mem::size_of::<char>(),
+                s,
+            )
+        })
     }
 
     #[inline]
@@ -140,10 +144,13 @@ impl<'a> Iterator for UWordBoundIndices<'a> {
 
 impl<'a> DoubleEndedIterator for UWordBoundIndices<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
-        self.iter
-            .next_back()
-            .map(|s| (s.as_ptr() as usize - self.start_offset, s))
+    fn next_back(&mut self) -> Option<(usize, &'a [char])> {
+        self.iter.next_back().map(|s| {
+            (
+                (s.as_ptr() as usize - self.start_offset) / core::mem::size_of::<char>(),
+                s,
+            )
+        })
     }
 }
 
@@ -187,7 +194,7 @@ fn is_emoji(ch: char) -> bool {
 }
 
 impl<'a> Iterator for UWordBounds<'a> {
-    type Item = &'a str;
+    type Item = &'a [char];
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -196,7 +203,7 @@ impl<'a> Iterator for UWordBounds<'a> {
     }
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<&'a [char]> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
@@ -214,7 +221,7 @@ impl<'a> Iterator for UWordBounds<'a> {
 
         // If extend/format/zwj were skipped. Handles precedence of WB3d over WB4
         let mut skipped_format_extend = false;
-        for (curr, ch) in self.string.char_indices() {
+        for (curr, &ch) in self.string.into_iter().enumerate() {
             idx = curr;
             // Whether or not the previous category was ZWJ
             // ZWJs get collapsed, so this handles precedence of WB3c over WB4
@@ -411,7 +418,7 @@ impl<'a> Iterator for UWordBounds<'a> {
         }
 
         self.cat = if take_curr {
-            idx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
+            idx += 1;
             None
         } else if take_cat {
             Some(cat)
@@ -427,7 +434,7 @@ impl<'a> Iterator for UWordBounds<'a> {
 
 impl<'a> DoubleEndedIterator for UWordBounds<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
+    fn next_back(&mut self) -> Option<&'a [char]> {
         use self::FormatExtendType::*;
         use self::UWordBoundsState::*;
         use crate::tables::word as wd;
@@ -438,7 +445,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
         let mut take_curr = true;
         let mut take_cat = true;
         let mut idx = self.string.len();
-        idx -= self.string.chars().next_back().unwrap().len_utf8();
+        idx -= 1;
         let mut previdx = idx;
         let mut saveidx = idx;
         let mut state = Start;
@@ -447,7 +454,7 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
 
         let mut skipped_format_extend = false;
 
-        for (curr, ch) in self.string.char_indices().rev() {
+        for (curr, &ch) in self.string.into_iter().enumerate().rev() {
             previdx = idx;
             idx = curr;
 
@@ -591,7 +598,8 @@ impl<'a> DoubleEndedIterator for UWordBounds<'a> {
                     wd::WC_Regional_Indicator => {
                         if regional_state == RegionalState::Unknown {
                             let count = self.string[..previdx]
-                                .chars()
+                                .into_iter()
+                                .copied()
                                 .rev()
                                 .map(|c| wd::word_category(c).2)
                                 .filter(|&c| {
@@ -673,24 +681,25 @@ impl<'a> UWordBounds<'a> {
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::UnicodeSegmentation;
-    /// let mut iter = "Hello world".split_word_bounds();
-    /// assert_eq!(iter.as_str(), "Hello world");
+    /// let mut iter = utf32!("Hello world").split_word_bounds();
+    /// assert_eq!(iter.as_chars(), utf32!("Hello world"));
     /// iter.next();
-    /// assert_eq!(iter.as_str(), " world");
+    /// assert_eq!(iter.as_chars(), utf32!(" world"));
     /// iter.next();
-    /// assert_eq!(iter.as_str(), "world");
+    /// assert_eq!(iter.as_chars(), utf32!("world"));
     /// ```
-    pub fn as_str(&self) -> &'a str {
+    pub fn as_chars(&self) -> &'a [char] {
         self.string
     }
 
     #[inline]
     fn get_next_cat(&self, idx: usize) -> Option<WordCat> {
         use crate::tables::word as wd;
-        let nidx = idx + self.string[idx..].chars().next().unwrap().len_utf8();
+        let nidx = idx + 1;
         if nidx < self.string.len() {
-            let nch = self.string[nidx..].chars().next().unwrap();
+            let nch = self.string[nidx];
             Some(wd::word_category(nch).2)
         } else {
             None
@@ -701,7 +710,7 @@ impl<'a> UWordBounds<'a> {
     fn get_prev_cat(&self, idx: usize) -> Option<WordCat> {
         use crate::tables::word as wd;
         if idx > 0 {
-            let nch = self.string[..idx].chars().next_back().unwrap();
+            let nch = self.string[idx - 1];
             Some(wd::word_category(nch).2)
         } else {
             None
@@ -710,7 +719,7 @@ impl<'a> UWordBounds<'a> {
 }
 
 #[inline]
-pub fn new_word_bounds<'b>(s: &'b str) -> UWordBounds<'b> {
+pub fn new_word_bounds<'b>(s: &'b [char]) -> UWordBounds<'b> {
     UWordBounds {
         string: s,
         cat: None,
@@ -719,7 +728,7 @@ pub fn new_word_bounds<'b>(s: &'b str) -> UWordBounds<'b> {
 }
 
 #[inline]
-pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
+pub fn new_word_bound_indices<'b>(s: &'b [char]) -> UWordBoundIndices<'b> {
     UWordBoundIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_word_bounds(s),
@@ -727,14 +736,14 @@ pub fn new_word_bound_indices<'b>(s: &'b str) -> UWordBoundIndices<'b> {
 }
 
 #[inline]
-fn has_alphanumeric(s: &&str) -> bool {
+fn has_alphanumeric(s: &&[char]) -> bool {
     use crate::tables::util::is_alphanumeric;
 
-    s.chars().any(|c| is_alphanumeric(c))
+    s.into_iter().copied().any(|c| is_alphanumeric(c))
 }
 
 #[inline]
-pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
+pub fn new_unicode_words<'b>(s: &'b [char]) -> UnicodeWords<'b> {
     use super::UnicodeSegmentation;
 
     UnicodeWords {
@@ -743,7 +752,7 @@ pub fn new_unicode_words<'b>(s: &'b str) -> UnicodeWords<'b> {
 }
 
 #[inline]
-pub fn new_unicode_word_indices<'b>(s: &'b str) -> UnicodeWordIndices<'b> {
+pub fn new_unicode_word_indices<'b>(s: &'b [char]) -> UnicodeWordIndices<'b> {
     use super::UnicodeSegmentation;
 
     UnicodeWordIndices {
