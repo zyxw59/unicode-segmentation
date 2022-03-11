@@ -191,7 +191,7 @@ mod fwd {
 
                 let next_cat = se::sentence_category(next_char).2;
 
-                self.pos += next_char.len_utf8();
+                self.pos += 1;
                 self.state = self.state.next(next_cat);
 
                 match next_cat {
