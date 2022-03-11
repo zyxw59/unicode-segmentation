@@ -45,7 +45,7 @@ mod fwd {
 
     #[derive(Clone)]
     pub struct SentenceBreaks<'a> {
-        pub string: &'a str,
+        pub string: &'a [char],
         pos: usize,
         state: SentenceBreaksState,
     }
@@ -99,7 +99,7 @@ mod fwd {
 
     // https://unicode.org/reports/tr29/#SB8
     // TODO cache this, it is currently quadratic
-    fn match_sb8(state: &SentenceBreaksState, ahead: &str) -> bool {
+    fn match_sb8(state: &SentenceBreaksState, ahead: &[char]) -> bool {
         let &SentenceBreaksState(parts) = state;
         let mut idx = if parts[3] == StatePart::SpPlus { 2 } else { 3 };
         if parts[idx] == StatePart::ClosePlus {
@@ -109,7 +109,7 @@ mod fwd {
         if parts[idx] == StatePart::ATerm {
             use crate::tables::sentence as se;
 
-            for next_char in ahead.chars() {
+            for &next_char in ahead {
                 //( ¬(OLetter | Upper | Lower | ParaSep | SATerm) )* Lower
                 match se::sentence_category(next_char).2 {
                     se::SC_Lower => return true,
@@ -185,7 +185,7 @@ mod fwd {
         fn next(&mut self) -> Option<usize> {
             use crate::tables::sentence as se;
 
-            for next_char in self.string[self.pos..].chars() {
+            for &next_char in &self.string[self.pos..] {
                 let position_before = self.pos;
                 let state_before = self.state.clone();
 
@@ -275,7 +275,7 @@ mod fwd {
         }
     }
 
-    pub fn new_sentence_breaks<'a>(source: &'a str) -> SentenceBreaks<'a> {
+    pub fn new_sentence_breaks<'a>(source: &'a [char]) -> SentenceBreaks<'a> {
         SentenceBreaks {
             string: source,
             pos: 0,
@@ -298,7 +298,7 @@ mod fwd {
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone)]
 pub struct UnicodeSentences<'a> {
-    inner: Filter<USentenceBounds<'a>, fn(&&str) -> bool>,
+    inner: Filter<USentenceBounds<'a>, fn(&&[char]) -> bool>,
 }
 
 /// External iterator for a string's
@@ -329,7 +329,7 @@ pub struct USentenceBoundIndices<'a> {
 }
 
 #[inline]
-pub fn new_sentence_bounds<'a>(source: &'a str) -> USentenceBounds<'a> {
+pub fn new_sentence_bounds<'a>(source: &'a [char]) -> USentenceBounds<'a> {
     USentenceBounds {
         iter: fwd::new_sentence_breaks(source),
         sentence_start: None,
@@ -337,7 +337,7 @@ pub fn new_sentence_bounds<'a>(source: &'a str) -> USentenceBounds<'a> {
 }
 
 #[inline]
-pub fn new_sentence_bound_indices<'a>(source: &'a str) -> USentenceBoundIndices<'a> {
+pub fn new_sentence_bound_indices<'a>(source: &'a [char]) -> USentenceBoundIndices<'a> {
     USentenceBoundIndices {
         start_offset: source.as_ptr() as usize,
         iter: new_sentence_bounds(source),
@@ -345,14 +345,14 @@ pub fn new_sentence_bound_indices<'a>(source: &'a str) -> USentenceBoundIndices<
 }
 
 #[inline]
-pub fn new_unicode_sentences<'b>(s: &'b str) -> UnicodeSentences<'b> {
+pub fn new_unicode_sentences<'b>(s: &'b [char]) -> UnicodeSentences<'b> {
     use super::UnicodeSegmentation;
     use crate::tables::util::is_alphanumeric;
 
-    fn has_alphanumeric(s: &&str) -> bool {
-        s.chars().any(|c| is_alphanumeric(c))
+    fn has_alphanumeric(s: &&[char]) -> bool {
+        s.into_iter().any(|c| is_alphanumeric(*c))
     }
-    let has_alphanumeric: fn(&&str) -> bool = has_alphanumeric; // coerce to fn pointer
+    let has_alphanumeric: fn(&&[char]) -> bool = has_alphanumeric; // coerce to fn pointer
 
     UnicodeSentences {
         inner: s.split_sentence_bounds().filter(has_alphanumeric),
@@ -360,16 +360,16 @@ pub fn new_unicode_sentences<'b>(s: &'b str) -> UnicodeSentences<'b> {
 }
 
 impl<'a> Iterator for UnicodeSentences<'a> {
-    type Item = &'a str;
+    type Item = &'a [char];
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<&'a [char]> {
         self.inner.next()
     }
 }
 
 impl<'a> Iterator for USentenceBounds<'a> {
-    type Item = &'a str;
+    type Item = &'a [char];
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -378,7 +378,7 @@ impl<'a> Iterator for USentenceBounds<'a> {
     }
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<&'a [char]> {
         if self.sentence_start == None {
             if let Some(start_pos) = self.iter.next() {
                 self.sentence_start = Some(start_pos)
@@ -399,13 +399,16 @@ impl<'a> Iterator for USentenceBounds<'a> {
 }
 
 impl<'a> Iterator for USentenceBoundIndices<'a> {
-    type Item = (usize, &'a str);
+    type Item = (usize, &'a [char]);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
-        self.iter
-            .next()
-            .map(|s| (s.as_ptr() as usize - self.start_offset, s))
+    fn next(&mut self) -> Option<(usize, &'a [char])> {
+        self.iter.next().map(|s| {
+            (
+                (s.as_ptr() as usize - self.start_offset) / core::mem::size_of::<char>(),
+                s,
+            )
+        })
     }
 
     #[inline]
