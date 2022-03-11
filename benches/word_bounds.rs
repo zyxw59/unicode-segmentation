@@ -7,7 +7,7 @@ use std::fs;
 use unicode_segmentation::UnicodeSegmentation;
 
 fn word_bounds(bench: &mut Bencher, path: &str) {
-    let text = fs::read_to_string(path).unwrap();
+    let text = fs::read_to_string(path).unwrap().chars().collect::<Vec<char>>();
     bench.iter(|| {
         for w in text.split_word_bounds() {
             bencher::black_box(w);

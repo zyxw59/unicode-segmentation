@@ -5,7 +5,7 @@ use std::fs;
 use unicode_segmentation::UnicodeSegmentation;
 
 fn graphemes(c: &mut Criterion, lang: &str, path: &str) {
-    let text = fs::read_to_string(path).unwrap();
+    let text = fs::read_to_string(path).unwrap().chars().collect::<Vec<char>>();
 
     c.bench_function(&format!("graphemes_{}", lang), |bench| {
         bench.iter(|| {

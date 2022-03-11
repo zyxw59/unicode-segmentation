@@ -7,7 +7,7 @@ use std::fs;
 use unicode_segmentation::UnicodeSegmentation;
 
 fn unicode_words(bench: &mut Bencher, path: &str) {
-    let text = fs::read_to_string(path).unwrap();
+    let text = fs::read_to_string(path).unwrap().chars().collect::<Vec<char>>();
     bench.iter(|| {
         for w in text.unicode_words() {
             bencher::black_box(w);
