@@ -30,28 +30,32 @@ impl<'a> GraphemeIndices<'a> {
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::UnicodeSegmentation;
-    /// let mut iter = "abc".grapheme_indices(true);
-    /// assert_eq!(iter.as_str(), "abc");
+    /// let mut iter = utf32!("abc").grapheme_indices(true);
+    /// assert_eq!(iter.as_chars(), utf32!("abc"));
     /// iter.next();
-    /// assert_eq!(iter.as_str(), "bc");
+    /// assert_eq!(iter.as_chars(), utf32!("bc"));
     /// iter.next();
     /// iter.next();
-    /// assert_eq!(iter.as_str(), "");
+    /// assert_eq!(iter.as_chars(), utf32!(""));
     /// ```
-    pub fn as_str(&self) -> &'a str {
-        self.iter.as_str()
+    pub fn as_chars(&self) -> &'a [char] {
+        self.iter.as_chars()
     }
 }
 
 impl<'a> Iterator for GraphemeIndices<'a> {
-    type Item = (usize, &'a str);
+    type Item = (usize, &'a [char]);
 
     #[inline]
-    fn next(&mut self) -> Option<(usize, &'a str)> {
-        self.iter
-            .next()
-            .map(|s| (s.as_ptr() as usize - self.start_offset, s))
+    fn next(&mut self) -> Option<(usize, &'a [char])> {
+        self.iter.next().map(|s| {
+            (
+                (s.as_ptr() as usize - self.start_offset) / core::mem::size_of::<char>(),
+                s,
+            )
+        })
     }
 
     #[inline]
@@ -62,10 +66,13 @@ impl<'a> Iterator for GraphemeIndices<'a> {
 
 impl<'a> DoubleEndedIterator for GraphemeIndices<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<(usize, &'a str)> {
-        self.iter
-            .next_back()
-            .map(|s| (s.as_ptr() as usize - self.start_offset, s))
+    fn next_back(&mut self) -> Option<(usize, &'a [char])> {
+        self.iter.next_back().map(|s| {
+            (
+                (s.as_ptr() as usize - self.start_offset) / core::mem::size_of::<char>(),
+                s,
+            )
+        })
     }
 }
 
@@ -79,7 +86,7 @@ impl<'a> DoubleEndedIterator for GraphemeIndices<'a> {
 /// [`UnicodeSegmentation`]: trait.UnicodeSegmentation.html
 #[derive(Clone, Debug)]
 pub struct Graphemes<'a> {
-    string: &'a str,
+    string: &'a [char],
     cursor: GraphemeCursor,
     cursor_back: GraphemeCursor,
 }
@@ -89,22 +96,23 @@ impl<'a> Graphemes<'a> {
     /// View the underlying data (the part yet to be iterated) as a slice of the original string.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::UnicodeSegmentation;
-    /// let mut iter = "abc".graphemes(true);
-    /// assert_eq!(iter.as_str(), "abc");
+    /// let mut iter = utf32!("abc").graphemes(true);
+    /// assert_eq!(iter.as_chars(), utf32!("abc"));
     /// iter.next();
-    /// assert_eq!(iter.as_str(), "bc");
+    /// assert_eq!(iter.as_chars(), utf32!("bc"));
     /// iter.next();
     /// iter.next();
-    /// assert_eq!(iter.as_str(), "");
+    /// assert_eq!(iter.as_chars(), utf32!(""));
     /// ```
-    pub fn as_str(&self) -> &'a str {
+    pub fn as_chars(&self) -> &'a [char] {
         &self.string[self.cursor.cur_cursor()..self.cursor_back.cur_cursor()]
     }
 }
 
 impl<'a> Iterator for Graphemes<'a> {
-    type Item = &'a str;
+    type Item = &'a [char];
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -113,7 +121,7 @@ impl<'a> Iterator for Graphemes<'a> {
     }
 
     #[inline]
-    fn next(&mut self) -> Option<&'a str> {
+    fn next(&mut self) -> Option<&'a [char]> {
         let start = self.cursor.cur_cursor();
         if start == self.cursor_back.cur_cursor() {
             return None;
@@ -125,7 +133,7 @@ impl<'a> Iterator for Graphemes<'a> {
 
 impl<'a> DoubleEndedIterator for Graphemes<'a> {
     #[inline]
-    fn next_back(&mut self) -> Option<&'a str> {
+    fn next_back(&mut self) -> Option<&'a [char]> {
         let end = self.cursor_back.cur_cursor();
         if end == self.cursor.cur_cursor() {
             return None;
@@ -140,7 +148,7 @@ impl<'a> DoubleEndedIterator for Graphemes<'a> {
 }
 
 #[inline]
-pub fn new_graphemes<'b>(s: &'b str, is_extended: bool) -> Graphemes<'b> {
+pub fn new_graphemes<'b>(s: &'b [char], is_extended: bool) -> Graphemes<'b> {
     let len = s.len();
     Graphemes {
         string: s,
@@ -150,7 +158,7 @@ pub fn new_graphemes<'b>(s: &'b str, is_extended: bool) -> Graphemes<'b> {
 }
 
 #[inline]
-pub fn new_grapheme_indices<'b>(s: &'b str, is_extended: bool) -> GraphemeIndices<'b> {
+pub fn new_grapheme_indices<'b>(s: &'b [char], is_extended: bool) -> GraphemeIndices<'b> {
     GraphemeIndices {
         start_offset: s.as_ptr() as usize,
         iter: new_graphemes(s, is_extended),
@@ -282,12 +290,13 @@ impl GraphemeCursor {
     /// The `offset` parameter must be on a codepoint boundary.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::GraphemeCursor;
-    /// let s = "हिन्दी";
+    /// let s = utf32!("हिन्दी");
     /// let mut legacy = GraphemeCursor::new(0, s.len(), false);
-    /// assert_eq!(legacy.next_boundary(s, 0), Ok(Some("ह".len())));
+    /// assert_eq!(legacy.next_boundary(s, 0), Ok(Some(utf32!("ह").len())));
     /// let mut extended = GraphemeCursor::new(0, s.len(), true);
-    /// assert_eq!(extended.next_boundary(s, 0), Ok(Some("हि".len())));
+    /// assert_eq!(extended.next_boundary(s, 0), Ok(Some(utf32!("हि").len())));
     /// ```
     pub fn new(offset: usize, len: usize, is_extended: bool) -> GraphemeCursor {
         let state = if offset == 0 || offset == len {
@@ -370,13 +379,14 @@ impl GraphemeCursor {
     /// `prev_boundary()`.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::GraphemeCursor;
-    /// // Two flags (🇷🇸🇮🇴), each flag is two RIS codepoints, each RIS is 4 bytes.
-    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
-    /// let mut cursor = GraphemeCursor::new(4, flags.len(), false);
-    /// assert_eq!(cursor.cur_cursor(), 4);
-    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(8)));
-    /// assert_eq!(cursor.cur_cursor(), 8);
+    /// // Two flags (🇷🇸🇮🇴), each flag is two RIS codepo
+    /// let flags = utf32!("\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}");
+    /// let mut cursor = GraphemeCursor::new(1, flags.len(), false);
+    /// assert_eq!(cursor.cur_cursor(), 1);
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(2)));
+    /// assert_eq!(cursor.cur_cursor(), 2);
     /// ```
     pub fn cur_cursor(&self) -> usize {
         self.offset
@@ -387,26 +397,27 @@ impl GraphemeCursor {
     /// `GraphemeIncomplete::PreContext` request.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
-    /// let mut cursor = GraphemeCursor::new(8, flags.len(), false);
+    /// let flags = utf32!("\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}");
+    /// let mut cursor = GraphemeCursor::new(2, flags.len(), false);
     /// // Not enough pre-context to decide if there's a boundary between the two flags.
-    /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Err(GraphemeIncomplete::PreContext(8)));
+    /// assert_eq!(cursor.is_boundary(&flags[2..], 2), Err(GraphemeIncomplete::PreContext(2)));
     /// // Provide one more Regional Indicator Symbol of pre-context
-    /// cursor.provide_context(&flags[4..8], 4);
+    /// cursor.provide_context(&flags[1..2], 1);
     /// // Still not enough context to decide.
-    /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Err(GraphemeIncomplete::PreContext(4)));
+    /// assert_eq!(cursor.is_boundary(&flags[2..], 2), Err(GraphemeIncomplete::PreContext(1)));
     /// // Provide additional requested context.
-    /// cursor.provide_context(&flags[0..4], 0);
+    /// cursor.provide_context(&flags[0..1], 0);
     /// // That's enough to decide (it always is when context goes to the start of the string)
-    /// assert_eq!(cursor.is_boundary(&flags[8..], 8), Ok(true));
+    /// assert_eq!(cursor.is_boundary(&flags[2..], 2), Ok(true));
     /// ```
-    pub fn provide_context(&mut self, chunk: &str, chunk_start: usize) {
+    pub fn provide_context(&mut self, chunk: &[char], chunk_start: usize) {
         use crate::tables::grapheme as gr;
         assert!(chunk_start + chunk.len() == self.pre_context_offset.unwrap());
         self.pre_context_offset = None;
         if self.is_extended && chunk_start + chunk.len() == self.offset {
-            let ch = chunk.chars().rev().next().unwrap();
+            let ch = *chunk.last().unwrap();
             if self.grapheme_category(ch) == gr::GC_Prepend {
                 self.decide(false); // GB9b
                 return;
@@ -417,7 +428,7 @@ impl GraphemeCursor {
             GraphemeState::Emoji => self.handle_emoji(chunk, chunk_start),
             _ => {
                 if self.cat_before.is_none() && self.offset == chunk.len() + chunk_start {
-                    let ch = chunk.chars().rev().next().unwrap();
+                    let ch = *chunk.last().unwrap();
                     self.cat_before = Some(self.grapheme_category(ch));
                 }
             }
@@ -453,10 +464,10 @@ impl GraphemeCursor {
     }
 
     #[inline]
-    fn handle_regional(&mut self, chunk: &str, chunk_start: usize) {
+    fn handle_regional(&mut self, chunk: &[char], chunk_start: usize) {
         use crate::tables::grapheme as gr;
         let mut ris_count = self.ris_count.unwrap_or(0);
-        for ch in chunk.chars().rev() {
+        for &ch in chunk.into_iter().rev() {
             if self.grapheme_category(ch) != gr::GC_Regional_Indicator {
                 self.ris_count = Some(ris_count);
                 self.decide((ris_count % 2) == 0);
@@ -474,16 +485,16 @@ impl GraphemeCursor {
     }
 
     #[inline]
-    fn handle_emoji(&mut self, chunk: &str, chunk_start: usize) {
+    fn handle_emoji(&mut self, chunk: &[char], chunk_start: usize) {
         use crate::tables::grapheme as gr;
-        let mut iter = chunk.chars().rev();
-        if let Some(ch) = iter.next() {
+        let mut iter = chunk.into_iter().rev();
+        if let Some(&ch) = iter.next() {
             if self.grapheme_category(ch) != gr::GC_ZWJ {
                 self.decide(true);
                 return;
             }
         }
-        for ch in iter {
+        for &ch in iter {
             match self.grapheme_category(ch) {
                 gr::GC_Extend => (),
                 gr::GC_Extended_Pictographic => {
@@ -521,16 +532,17 @@ impl GraphemeCursor {
     /// the same content for it).
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::GraphemeCursor;
-    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
-    /// let mut cursor = GraphemeCursor::new(8, flags.len(), false);
+    /// let flags = utf32!("\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}");
+    /// let mut cursor = GraphemeCursor::new(2, flags.len(), false);
     /// assert_eq!(cursor.is_boundary(flags, 0), Ok(true));
-    /// cursor.set_cursor(12);
+    /// cursor.set_cursor(3);
     /// assert_eq!(cursor.is_boundary(flags, 0), Ok(false));
     /// ```
     pub fn is_boundary(
         &mut self,
-        chunk: &str,
+        chunk: &[char],
         chunk_start: usize,
     ) -> Result<bool, GraphemeIncomplete> {
         use crate::tables::grapheme as gr;
@@ -550,7 +562,7 @@ impl GraphemeCursor {
         }
         let offset_in_chunk = self.offset - chunk_start;
         if self.cat_after.is_none() {
-            let ch = chunk[offset_in_chunk..].chars().next().unwrap();
+            let ch = chunk[offset_in_chunk];
             self.cat_after = Some(self.grapheme_category(ch));
         }
         if self.offset == chunk_start {
@@ -566,7 +578,7 @@ impl GraphemeCursor {
             }
         }
         if self.cat_before.is_none() {
-            let ch = chunk[..offset_in_chunk].chars().rev().next().unwrap();
+            let ch = chunk[offset_in_chunk - 1];
             self.cat_before = Some(self.grapheme_category(ch));
         }
         match check_pair(self.cat_before.unwrap(), self.cat_after.unwrap()) {
@@ -602,19 +614,21 @@ impl GraphemeCursor {
     /// See `is_boundary` for expectations on the provided chunk.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::GraphemeCursor;
-    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
-    /// let mut cursor = GraphemeCursor::new(4, flags.len(), false);
-    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(8)));
-    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(16)));
+    /// let flags = utf32!("\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}");
+    /// let mut cursor = GraphemeCursor::new(1, flags.len(), false);
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(2)));
+    /// assert_eq!(cursor.next_boundary(flags, 0), Ok(Some(4)));
     /// assert_eq!(cursor.next_boundary(flags, 0), Ok(None));
     /// ```
     ///
     /// And an example that uses partial strings:
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-    /// let s = "abcd";
+    /// let s = utf32!("abcd");
     /// let mut cursor = GraphemeCursor::new(0, s.len(), false);
     /// assert_eq!(cursor.next_boundary(&s[..2], 0), Ok(Some(1)));
     /// assert_eq!(cursor.next_boundary(&s[..2], 0), Err(GraphemeIncomplete::NextChunk));
@@ -625,21 +639,21 @@ impl GraphemeCursor {
     /// ```
     pub fn next_boundary(
         &mut self,
-        chunk: &str,
+        chunk: &[char],
         chunk_start: usize,
     ) -> Result<Option<usize>, GraphemeIncomplete> {
         if self.offset == self.len {
             return Ok(None);
         }
-        let mut iter = chunk[self.offset - chunk_start..].chars();
-        let mut ch = iter.next().unwrap();
+        let mut iter = chunk[self.offset - chunk_start..].into_iter();
+        let mut ch = *iter.next().unwrap();
         loop {
             if self.resuming {
                 if self.cat_after.is_none() {
                     self.cat_after = Some(self.grapheme_category(ch));
                 }
             } else {
-                self.offset += ch.len_utf8();
+                self.offset += 1;
                 self.state = GraphemeState::Unknown;
                 self.cat_before = self.cat_after.take();
                 if self.cat_before.is_none() {
@@ -650,7 +664,7 @@ impl GraphemeCursor {
                 } else {
                     self.ris_count = Some(0);
                 }
-                if let Some(next_ch) = iter.next() {
+                if let Some(&next_ch) = iter.next() {
                     ch = next_ch;
                     self.cat_after = Some(self.grapheme_category(ch));
                 } else if self.offset == self.len {
@@ -680,10 +694,11 @@ impl GraphemeCursor {
     /// See `is_boundary` for expectations on the provided chunk.
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::GraphemeCursor;
-    /// let flags = "\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}";
-    /// let mut cursor = GraphemeCursor::new(12, flags.len(), false);
-    /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(Some(8)));
+    /// let flags = utf32!("\u{1F1F7}\u{1F1F8}\u{1F1EE}\u{1F1F4}");
+    /// let mut cursor = GraphemeCursor::new(3, flags.len(), false);
+    /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(Some(2)));
     /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(Some(0)));
     /// assert_eq!(cursor.prev_boundary(flags, 0), Ok(None));
     /// ```
@@ -692,8 +707,9 @@ impl GraphemeCursor {
     /// guaranteed, and may be `PrevChunk` or `PreContext` arbitrarily):
     ///
     /// ```rust
+    /// use utf32_lit::utf32;
     /// # use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
-    /// let s = "abcd";
+    /// let s = utf32!("abcd");
     /// let mut cursor = GraphemeCursor::new(4, s.len(), false);
     /// assert_eq!(cursor.prev_boundary(&s[2..4], 2), Ok(Some(3)));
     /// assert_eq!(cursor.prev_boundary(&s[2..4], 2), Err(GraphemeIncomplete::PrevChunk));
@@ -704,7 +720,7 @@ impl GraphemeCursor {
     /// ```
     pub fn prev_boundary(
         &mut self,
-        chunk: &str,
+        chunk: &[char],
         chunk_start: usize,
     ) -> Result<Option<usize>, GraphemeIncomplete> {
         if self.offset == 0 {
@@ -713,8 +729,8 @@ impl GraphemeCursor {
         if self.offset == chunk_start {
             return Err(GraphemeIncomplete::PrevChunk);
         }
-        let mut iter = chunk[..self.offset - chunk_start].chars().rev();
-        let mut ch = iter.next().unwrap();
+        let mut iter = chunk[..self.offset - chunk_start].into_iter().rev();
+        let mut ch = *iter.next().unwrap();
         loop {
             if self.offset == chunk_start {
                 self.resuming = true;
@@ -723,7 +739,7 @@ impl GraphemeCursor {
             if self.resuming {
                 self.cat_before = Some(self.grapheme_category(ch));
             } else {
-                self.offset -= ch.len_utf8();
+                self.offset -= 1;
                 self.cat_after = self.cat_before.take();
                 self.state = GraphemeState::Unknown;
                 if let Some(ris_count) = self.ris_count {
@@ -733,7 +749,7 @@ impl GraphemeCursor {
                         None
                     };
                 }
-                if let Some(prev_ch) = iter.next() {
+                if let Some(&prev_ch) = iter.next() {
                     ch = prev_ch;
                     self.cat_before = Some(self.grapheme_category(ch));
                 } else if self.offset == 0 {
@@ -755,18 +771,20 @@ impl GraphemeCursor {
 }
 
 #[test]
+#[utf32_lit::utf32_all_strings]
 fn test_grapheme_cursor_ris_precontext() {
     let s = "\u{1f1fa}\u{1f1f8}\u{1f1fa}\u{1f1f8}\u{1f1fa}\u{1f1f8}";
-    let mut c = GraphemeCursor::new(8, s.len(), true);
+    let mut c = GraphemeCursor::new(2, s.len(), true);
     assert_eq!(
-        c.is_boundary(&s[4..], 4),
-        Err(GraphemeIncomplete::PreContext(4))
+        c.is_boundary(&s[1..], 1),
+        Err(GraphemeIncomplete::PreContext(1))
     );
-    c.provide_context(&s[..4], 0);
-    assert_eq!(c.is_boundary(&s[4..], 4), Ok(true));
+    c.provide_context(&s[..1], 0);
+    assert_eq!(c.is_boundary(&s[1..], 1), Ok(true));
 }
 
 #[test]
+#[utf32_lit::utf32_all_strings]
 fn test_grapheme_cursor_chunk_start_require_precontext() {
     let s = "\r\n";
     let mut c = GraphemeCursor::new(1, s.len(), true);
@@ -779,6 +797,7 @@ fn test_grapheme_cursor_chunk_start_require_precontext() {
 }
 
 #[test]
+#[utf32_lit::utf32_all_strings]
 fn test_grapheme_cursor_prev_boundary() {
     let s = "abcd";
     let mut c = GraphemeCursor::new(3, s.len(), true);
@@ -790,6 +809,7 @@ fn test_grapheme_cursor_prev_boundary() {
 }
 
 #[test]
+#[utf32_lit::utf32_all_strings]
 fn test_grapheme_cursor_prev_boundary_chunk_start() {
     let s = "abcd";
     let mut c = GraphemeCursor::new(2, s.len(), true);

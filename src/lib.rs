@@ -18,9 +18,9 @@
 //!
 //! fn main() {
 //!     let s = utf32!("a̐éö̲\r\n");
-//!     // let g = UnicodeSegmentation::graphemes(s, true).collect::<Vec<&[char]>>();
-//!     // let b: &[_] = &["a̐", "é", "ö̲", "\r\n"];
-//!     // assert_eq!(g, b);
+//!     let g = UnicodeSegmentation::graphemes(s, true).collect::<Vec<&[char]>>();
+//!     let b: &[_] = utf32!(&["a̐", "é", "ö̲", "\r\n"]);
+//!     assert_eq!(g, b);
 //!
 //!     let s = utf32!("The quick (\"brown\") fox can't jump 32.3 feet, right?");
 //!     let w = s.unicode_words().collect::<Vec<&[char]>>();
@@ -64,13 +64,13 @@ extern crate std;
 #[macro_use]
 extern crate quickcheck;
 
-// pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
-// pub use grapheme::{GraphemeIndices, Graphemes};
+pub use grapheme::{GraphemeCursor, GraphemeIncomplete};
+pub use grapheme::{GraphemeIndices, Graphemes};
 // pub use sentence::{USentenceBoundIndices, USentenceBounds, UnicodeSentences};
 pub use tables::UNICODE_VERSION;
 pub use word::{UWordBoundIndices, UWordBounds, UnicodeWordIndices, UnicodeWords};
 
-// mod grapheme;
+mod grapheme;
 #[rustfmt::skip]
 #[allow(dead_code)]
 mod tables;
@@ -86,47 +86,49 @@ mod testdata;
 /// Methods for segmenting strings according to
 /// [Unicode Standard Annex #29](http://www.unicode.org/reports/tr29/).
 pub trait UnicodeSegmentation {
-    //    /// Returns an iterator over the [grapheme clusters][graphemes] of `self`.
-    //    ///
-    //    /// [graphemes]: http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
-    //    ///
-    //    /// If `is_extended` is true, the iterator is over the
-    //    /// *extended grapheme clusters*;
-    //    /// otherwise, the iterator is over the *legacy grapheme clusters*.
-    //    /// [UAX#29](http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
-    //    /// recommends extended grapheme cluster boundaries for general processing.
-    //    ///
-    //    /// # Examples
-    //    ///
-    //    /// ```
-    //    /// # use self::unicode_segmentation::UnicodeSegmentation;
-    //    /// let gr1 = UnicodeSegmentation::graphemes("a\u{310}e\u{301}o\u{308}\u{332}", true)
-    //    ///           .collect::<Vec<&[char]>>();
-    //    /// let b: &[_] = &["a\u{310}", "e\u{301}", "o\u{308}\u{332}"];
-    //    ///
-    //    /// assert_eq!(&gr1[..], b);
-    //    ///
-    //    /// let gr2 = UnicodeSegmentation::graphemes("a\r\nb🇷🇺🇸🇹", true).collect::<Vec<&[char]>>();
-    //    /// let b: &[_] = &["a", "\r\n", "b", "🇷🇺", "🇸🇹"];
-    //    ///
-    //    /// assert_eq!(&gr2[..], b);
-    //    /// ```
-    //    fn graphemes<'a>(&'a self, is_extended: bool) -> Graphemes<'a>;
-    //
-    //    /// Returns an iterator over the grapheme clusters of `self` and their
-    //    /// byte offsets. See `graphemes()` for more information.
-    //    ///
-    //    /// # Examples
-    //    ///
-    //    /// ```
-    //    /// # use self::unicode_segmentation::UnicodeSegmentation;
-    //    /// let gr_inds = UnicodeSegmentation::grapheme_indices("a̐éö̲\r\n", true)
-    //    ///               .collect::<Vec<(usize, &[char])>>();
-    //    /// let b: &[_] = &[(0, "a̐"), (3, "é"), (6, "ö̲"), (11, "\r\n")];
-    //    ///
-    //    /// assert_eq!(&gr_inds[..], b);
-    //    /// ```
-    //    fn grapheme_indices<'a>(&'a self, is_extended: bool) -> GraphemeIndices<'a>;
+    /// Returns an iterator over the [grapheme clusters][graphemes] of `self`.
+    ///
+    /// [graphemes]: http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+    ///
+    /// If `is_extended` is true, the iterator is over the
+    /// *extended grapheme clusters*;
+    /// otherwise, the iterator is over the *legacy grapheme clusters*.
+    /// [UAX#29](http://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries)
+    /// recommends extended grapheme cluster boundaries for general processing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use utf32_lit::utf32;
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let gr1 = UnicodeSegmentation::graphemes(utf32!("a\u{310}e\u{301}o\u{308}\u{332}"), true)
+    ///           .collect::<Vec<&[char]>>();
+    /// let b: &[_] = utf32!(&["a\u{310}", "e\u{301}", "o\u{308}\u{332}"]);
+    ///
+    /// assert_eq!(&gr1[..], b);
+    ///
+    /// let gr2 = UnicodeSegmentation::graphemes(utf32!("a\r\nb🇷🇺🇸🇹"), true).collect::<Vec<&[char]>>();
+    /// let b: &[_] = utf32!(&["a", "\r\n", "b", "🇷🇺", "🇸🇹"]);
+    ///
+    /// assert_eq!(&gr2[..], b);
+    /// ```
+    fn graphemes<'a>(&'a self, is_extended: bool) -> Graphemes<'a>;
+
+    /// Returns an iterator over the grapheme clusters of `self` and their
+    /// byte offsets. See `graphemes()` for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use utf32_lit::utf32;
+    /// # use self::unicode_segmentation::UnicodeSegmentation;
+    /// let gr_inds = UnicodeSegmentation::grapheme_indices(utf32!("a̐éö̲\r\n"), true)
+    ///               .collect::<Vec<(usize, &[char])>>();
+    /// let b: &[_] = utf32!(&[(0, "a̐"), (2, "é"), (4, "ö̲"), (7, "\r\n")]);
+    ///
+    /// assert_eq!(&gr_inds[..], b);
+    /// ```
+    fn grapheme_indices<'a>(&'a self, is_extended: bool) -> GraphemeIndices<'a>;
 
     /// Returns an iterator over the words of `self`, separated on
     /// [UAX#29 word boundaries](http://www.unicode.org/reports/tr29/#Word_Boundaries).
@@ -267,15 +269,15 @@ pub trait UnicodeSegmentation {
 }
 
 impl UnicodeSegmentation for [char] {
-    //    #[inline]
-    //    fn graphemes(&self, is_extended: bool) -> Graphemes {
-    //        grapheme::new_graphemes(self, is_extended)
-    //    }
-    //
-    //    #[inline]
-    //    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices {
-    //        grapheme::new_grapheme_indices(self, is_extended)
-    //    }
+    #[inline]
+    fn graphemes(&self, is_extended: bool) -> Graphemes {
+        grapheme::new_graphemes(self, is_extended)
+    }
+
+    #[inline]
+    fn grapheme_indices(&self, is_extended: bool) -> GraphemeIndices {
+        grapheme::new_grapheme_indices(self, is_extended)
+    }
 
     #[inline]
     fn unicode_words(&self) -> UnicodeWords {
